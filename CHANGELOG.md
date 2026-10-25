@@ -43,6 +43,12 @@ installed tarball.
 - **Comments travel with the request**: `POST /__canvas/review` now carries the unresolved
   threads for the selected screens, so the agent receives the instruction and not just the
   screen.
+- **States and flows.** `state` is treated as an opaque app token, so one mechanism covers
+  overlays, empty/loading/error datasets and anything else the app can reproduce from a URL.
+  `flow` in the config declares an ordered path through one screen; the canvas draws it as
+  labelled wires between ordinary frames, in the world layer, so the path pans and zooms with
+  the frames and follows them when they move. On a fresh layout, flow steps get their own row.
+- **Fit fits the selection** when there is one, everything otherwise.
 - `examples/ledger/` — a second app (path routing, real `<a href>` links, two drawers, no
   canvas code) used to check that none of this is Kestrel-specific.
 - Package metadata: `bin` (`canvas`, `canvas-agent`), `files`, `engines`, `check` script,
@@ -77,6 +83,8 @@ installed tarball.
   Served HTML now carries `<base href="/">` unless the app ships its own.
 - A frame that navigated to a parameterised route showed the raw id (`2288`) instead of a name;
   the label now borrows a sibling manifest entry (`/case/2291` → "Case detail").
+- Frame labels are counter-scaled to stay readable at any zoom, which turned a 22-screen map
+  into a lattice of overlapping chips at 9%. Below 30% they now ride the zoom instead.
 
 ## [0.1.0] — 2026-10-25
 

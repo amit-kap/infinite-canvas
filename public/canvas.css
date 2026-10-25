@@ -214,7 +214,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
   user-select: none;
   cursor: grab;
   transform-origin: left bottom;
-  transform: scale(var(--inv));
+  /* Counter-scaled so a label stays readable however far out you are — but only
+     until it stops fitting. Past 30% zoom it shrinks with the canvas, or a
+     22-screen map becomes a lattice of overlapping chips. */
+  transform: scale(calc(var(--inv) * var(--label, 1)));
   box-shadow: 0 1px 2px rgba(23, 23, 26, 0.05);
 }
 
@@ -591,4 +594,41 @@ body.has-drawer #selbar { left: calc((100vw - 320px) / 2); }
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+}
+
+/* ---------------------------------------------------------------- wires
+   A flow is drawn, not stored: the path lives in the world layer so it pans
+   and zooms with everything else. Stroke is non-scaling, so a wire stays a
+   hairline at 20% and a hairline at 200% instead of turning into a rope. */
+
+#wires {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 0;
+}
+
+#wires .wire {
+  fill: none;
+  stroke: #b9b9b2;
+  stroke-width: 1.5px;
+  stroke-dasharray: 5 5;
+  vector-effect: non-scaling-stroke;
+}
+
+#wires .wire__head {
+  fill: #b9b9b2;
+}
+
+#wires .wire__label {
+  /* Counter-scaled like the frame labels: the wire is in world space, but its
+     text has to stay readable at any zoom. */
+  font-size: calc(11px * var(--inv, 1));
+  fill: #8c8c85;
+  font-family: inherit;
+  letter-spacing: 0.01em;
 }

@@ -1,8 +1,46 @@
 (function () {
   'use strict';
 
-  const D = window.KESTREL_DATA;
+  const DATA = window.KESTREL_DATA;
   const ROUTES = window.KESTREL_ROUTES;
+
+  // A canvas screen is a route *plus* a state token, and the token is the app's
+  // own vocabulary — the canvas only carries it in the URL. `new-case` opens a
+  // drawer; `empty` and `created` change the data; `loading` and `error` change
+  // how the screen reports itself. The canvas does not need to know which is
+  // which, and adding a state is app work, not tool work.
+  const EMPTY = {
+    cases: [],
+    alerts: [],
+    rules: [],
+    integrations: [],
+    team: [],
+    invoices: [],
+    activity: [],
+    signals: [],
+    caseNotes: [],
+  };
+
+  const CREATED_CASE = {
+    id: 'CAS-2294',
+    title: 'Suspicious OAuth grant — finance-app',
+    severity: 'High',
+    owner: 'Dana Levi',
+    sla: '2d left',
+    status: 'Open',
+    source: 'Google',
+    opened: 'just now',
+    mine: true,
+    breaching: false,
+  };
+
+  function dataFor(token) {
+    if (token === 'empty') return { ...DATA, ...EMPTY };
+    if (token === 'created') return { ...DATA, cases: [CREATED_CASE, ...DATA.cases] };
+    return DATA;
+  }
+
+  const D = dataFor(readState());
 
   const NAV = [
     { label: 'Monitor', items: ['overview'] },
@@ -48,6 +86,9 @@
 
   // A screen can be a route plus one open overlay, carried in the URL so the
   // frame is reproducible: reload it and the drawer is still open.
+  //
+  // `new-case-invalid` is the same drawer after a failed submit — one field in
+  // an error state. Several screens can share one overlay; the token decides.
   function readState() {
     return new URLSearchParams(location.search).get('state') || '';
   }
@@ -121,16 +162,43 @@
     const base = parts[0];
     const id = parts[1];
     const page = (PAGES[base] || PAGES.overview)(id);
+    const shell = ui.state === 'loading' ? skeleton() : ui.state === 'error' ? failure(page) : null;
 
     navEl.innerHTML = navHTML(base);
     topEl.innerHTML =
       `<div><div class="top__title">${esc(page.title)}</div>` +
       (page.sub ? `<div class="top__sub">${esc(page.sub)}</div>` : '') +
-      `</div><div class="top__actions">${page.actions || ''}</div>`;
-    contentEl.innerHTML = page.body;
+      `</div><div class="top__actions">${shell ? '' : page.actions || ''}</div>`;
+    contentEl.innerHTML = shell || page.body;
     contentEl.scrollTop = 0;
     applyFilters();
     renderOverlay();
+  }
+
+  // The two states every real screen has and almost no design file draws.
+  function skeleton() {
+    const rows = Array.from(
+      { length: 6 },
+      () =>
+        `<div class="skel__row"><span class="skel__b skel__b--wide"></span><span class="skel__b"></span><span class="skel__b"></span></div>`
+    ).join('');
+    return (
+      `<div class="card pad" aria-busy="true" aria-label="Loading">` +
+      `<div class="skel__row skel__row--head"><span class="skel__b"></span><span class="skel__b"></span><span class="skel__b"></span><span class="skel__b"></span></div>` +
+      rows +
+      `</div>`
+    );
+  }
+
+  function failure(page) {
+    return (
+      `<div class="card pad failed">` +
+      `<div class="failed__title">Couldn't load ${esc(page.title.toLowerCase())}</div>` +
+      `<div class="failed__body">The cases service didn't answer in 30s. Nothing was lost — this is a read, not a write.</div>` +
+      `<div class="failed__foot"><button type="button" class="btn" data-act="retry">Try again</button>` +
+      `<span class="failed__code">cases.list · 504</span></div>` +
+      `</div>`
+    );
   }
 
   // ---------------------------------------------------------------- pages
@@ -203,7 +271,9 @@
           </div>
 
           <div class="card">
-            <table class="table" id="casesTable">
+            ${
+              D.cases.length
+                ? `<table class="table" id="casesTable">
               <thead><tr><th>Case</th><th>Severity</th><th>Owner</th><th>SLA</th></tr></thead>
               <tbody>
                 ${D.cases
@@ -217,7 +287,13 @@
                   )
                   .join('')}
               </tbody>
-            </table>
+            </table>`
+                : `<div class="blank">
+                    <div class="blank__title">No cases yet</div>
+                    <div class="blank__body">Cases open from an alert, or you can file one by hand.</div>
+                    <button type="button" class="btn btn--primary" data-nav="case/2291">New case</button>
+                  </div>`
+            }
           </div>
         `,
       };
@@ -645,9 +721,12 @@
       route: 'cases',
       title: 'New case',
       sub: 'Without an alert',
-      body: `
+      body: ({ invalid }) => `
         <div class="form">
-          <div class="form__row form__row--wide"><div class="form__label">Title</div><input class="input" placeholder="What happened?" /></div>
+          <div class="form__row form__row--wide"><div class="form__label">Title</div>
+            <input class="input${invalid ? ' input--error' : ''}" placeholder="What happened?" value="${invalid ? '' : ''}" />
+            ${invalid ? '<div class="field__error">Give the case a title.</div>' : ''}
+          </div>
           <div class="form__row"><div class="form__label">Severity</div>
             <select class="input">${['Critical', 'High', 'Medium', 'Low'].map((s) => `<option${s === 'High' ? ' selected' : ''}>${s}</option>`).join('')}</select>
           </div>
@@ -734,11 +813,17 @@
   };
 
   function renderOverlay() {
-    const spec = OVERLAYS[ui.state];
+    // A state token can name a variant of an overlay: `new-case-invalid` is the
+    // new-case drawer after a failed submit. One overlay, several screens.
+    const invalid = /-invalid$/.test(ui.state);
+    const spec = OVERLAYS[invalid ? ui.state.replace(/-invalid$/, '') : ui.state];
     if (!spec || spec.route !== ui.route) {
       overlayEl.innerHTML = '';
       return;
     }
+    const body = typeof spec.body === 'function' ? spec.body({ invalid }) : spec.body;
+    const foot = typeof spec.foot === 'function' ? spec.foot({ invalid }) : spec.foot;
+
     overlayEl.innerHTML =
       `<div class="scrim" data-act="closeOverlay"></div>` +
       `<aside class="sheet" role="dialog" aria-modal="true" aria-label="${esc(spec.title)}">` +
@@ -746,8 +831,8 @@
       `<div><div class="sheet__title">${esc(spec.title)}</div><div class="sheet__sub">${esc(spec.sub)}</div></div>` +
       `<button type="button" class="sheet__x" data-act="closeOverlay" aria-label="Close">×</button>` +
       `</div>` +
-      `<div class="sheet__body">${spec.body}</div>` +
-      `<div class="sheet__foot">${spec.foot}</div>` +
+      `<div class="sheet__body">${body}</div>` +
+      `<div class="sheet__foot">${foot}</div>` +
       `</aside>`;
   }
 

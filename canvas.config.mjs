@@ -30,5 +30,34 @@ export default {
     { key: 'alerts', state: 'suppress', title: 'Suppress alert', group: 'Respond' },
     { key: 'case/2291', state: 'escalate', title: 'Escalate case', group: 'Respond' },
     { key: 'team', state: 'invite', title: 'Invite member', group: 'Set up' },
+
+    // States of one screen: the same route, different reality. These are not
+    // variants of the design — they are what the screen actually is before data
+    // arrives, when it is empty, and when the request fails. They sit beside the
+    // real thing so a review can start from "what does this look like when…".
+    { key: 'cases', state: 'empty', title: 'Cases — empty', group: 'States' },
+    { key: 'cases', state: 'loading', title: 'Cases — loading', group: 'States' },
+    { key: 'cases', state: 'error', title: 'Cases — error', group: 'States' },
+    { key: 'overview', state: 'empty', title: 'Overview — first run', group: 'States' },
+
+    // The middle and end of the flow below. They are ordinary screens — one
+    // route, one state — which is why the flow only needs to name them.
+    { key: 'cases', state: 'new-case-invalid', title: 'New case — invalid', group: 'Flow' },
+    { key: 'cases', state: 'created', title: 'Case created', group: 'Flow' },
+  ],
+
+  // A flow is an ordered path through one screen, not a set of siblings. Same
+  // route every step, different state — the thing a screenshot of the finished
+  // screen can never show. The canvas draws the path between the frames.
+  flow: [
+    {
+      title: 'New case',
+      steps: [
+        { id: 'cases', label: 'open' },
+        { id: 'cases~new-case', label: 'click "New case"' },
+        { id: 'cases~new-case-invalid', label: 'submit empty' },
+        { id: 'cases~created', label: 'submit valid' },
+      ],
+    },
   ],
 };

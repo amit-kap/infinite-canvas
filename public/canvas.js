@@ -7,6 +7,10 @@
   // Screens added by hand (a drawer the crawler cannot see). They live in
   // layout.json next to the frames, so they survive a reload.
   let ADDED = [];
+  // Ordered paths through screens: [{ title, steps: [{ id, label }] }]. A flow
+  // is drawn, not stored — the frames own their positions.
+  let FLOWS = [];
+  let wiresDirty = false;
   let ROUTER = 'path';
   let APP_TITLE = '';
   const FW = 1280;
@@ -28,6 +32,7 @@
   const grid = document.getElementById('grid');
   const world = document.getElementById('world');
   const framesEl = document.getElementById('frames');
+  const wires = document.getElementById('wires');
   const zoomLabel = document.getElementById('zoomLabel');
   const selbar = document.getElementById('selbar');
   const selCount = document.getElementById('selCount');
@@ -194,13 +199,23 @@
     if (cam.z !== paintedZ) {
       paintedZ = cam.z;
       world.style.setProperty('--inv', String(1 / cam.z));
+      // Labels are counter-scaled to stay legible, but past a point that turns
+      // the map into a pile of overlapping chips; below 30% they ride the zoom.
+      world.style.setProperty('--label', String(cam.z < 0.3 ? Math.max(0.3, cam.z / 0.3) : 1));
       world.classList.toggle('is-far', cam.z < 0.5);
       zoomLabel.textContent = Math.round(cam.z * 100) + '%';
+      // The wire labels sit a fixed number of *screen* pixels off the line, so a
+      // zoom changes where they belong.
+      wiresDirty = true;
     }
     // The dot grid repeats every 28px, so the modulo keeps it in phase while
     // moving on the compositor instead of repainting the stage background.
     grid.style.transform = `translate3d(${cam.x % 28}px, ${cam.y % 28}px, 0)`;
     updateMinimapView();
+    if (wiresDirty) {
+      wiresDirty = false;
+      drawWires();
+    }
   }
 
   function stopAnim() {
@@ -349,13 +364,14 @@
     zoomAnim(viewW / 2, viewH / 2, clamp(base * factor, MINZ, MAXZ), 160);
   }
 
-  function bounds() {
-    if (!frames.length) return { x: 0, y: 0, w: FW, h: FH };
+  function bounds(list) {
+    const set = list && list.length ? list : frames;
+    if (!set.length) return { x: 0, y: 0, w: FW, h: FH };
     let x1 = Infinity;
     let y1 = Infinity;
     let x2 = -Infinity;
     let y2 = -Infinity;
-    frames.forEach((f) => {
+    set.forEach((f) => {
       x1 = Math.min(x1, f.x);
       y1 = Math.min(y1, f.y);
       x2 = Math.max(x2, f.x + FW);
@@ -364,8 +380,13 @@
     return { x: x1, y: y1, w: x2 - x1, h: y2 - y1 };
   }
 
+  // Fit what you are looking at: the selection if there is one, everything
+  // otherwise. Ten screens in the corner and fifty elsewhere is the normal case
+  // once a canvas grows, and "fit" meaning "zoom out until it's unreadable"
+  // helps nobody.
   function fit(instant) {
-    const b = bounds();
+    const chosen = selected.size ? frames.filter((f) => selected.has(f.id)) : frames;
+    const b = bounds(chosen);
     const pad = 56;
     const labelSpace = 44;
     const z = clamp(Math.min((viewW - pad * 2) / b.w, (viewH - pad * 2) / (b.h + labelSpace)), MINZ, 1);
@@ -465,10 +486,26 @@
   }
 
   function layoutAll() {
-    ROUTES.forEach((entry, i) => {
+    // A flow reads as a path, so its steps get a row of their own instead of a
+    // place in the grid — otherwise the wire crosses half the canvas. Only on a
+    // fresh layout: once you move a frame, your arrangement is the truth.
+    const inFlow = new Set();
+    FLOWS.forEach((flow) => flow.steps.forEach((step) => inFlow.add(step.id)));
+
+    const grid = ROUTES.filter((entry) => !inFlow.has(screenId(entry)));
+    grid.forEach((entry, i) => {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
       addFrame(screenId(entry), col * (FW + GX), row * (FH + GY));
+    });
+
+    let y = Math.ceil(grid.length / COLS) * (FH + GY);
+    // Flow steps sit further apart than grid neighbours: the gap is where the
+    // wire and its label live.
+    const flowPitch = FW + 380;
+    FLOWS.forEach((flow) => {
+      flow.steps.forEach((step, i) => addFrame(step.id, i * flowPitch, y));
+      y += FH + GY;
     });
   }
 
@@ -500,6 +537,7 @@
     selected.clear();
     syncSelection();
     buildMinimap();
+    drawWires();
     renderDrawer();
     updateEmpty();
     save();
@@ -512,6 +550,7 @@
     layoutAll();
     syncSelection();
     buildMinimap();
+    drawWires();
     renderDrawer();
     save();
     fit();
@@ -1153,6 +1192,7 @@
       });
       showGuides(snapped.gx, snapped.gy);
       layoutMinimap();
+      markWires();
     };
 
     const up = () => {
@@ -1655,6 +1695,85 @@
     });
   }
 
+  // ---------------------------------------------------------------- flows
+  //
+  // A flow is an ordered path through one screen: same route, different state,
+  // one step after another. The frames are ordinary screens — the canvas only
+  // draws the path, so a flow costs nothing until you look at it.
+  //
+  // The wires live inside #world, which the camera transforms, so they pan and
+  // zoom for free; the only thing that needs redrawing is a frame moving.
+
+  function markWires() {
+    wiresDirty = true;
+    applyCam();
+  }
+
+  function wireEndpoints(from, to) {
+    // Centre-to-centre along the shorter axis, so a row reads left to right and
+    // a column reads top to bottom.
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    if (Math.abs(dx) >= Math.abs(dy)) {
+      const dir = dx >= 0 ? 1 : -1;
+      const y = Math.max(from.y, to.y) + FH / 2 + Math.abs(dy) * 0.1;
+      return {
+        a: { x: dir > 0 ? from.x + FW : from.x, y: from.y + FH / 2 },
+        b: { x: dir > 0 ? to.x : to.x + FW, y: to.y + FH / 2 },
+        dir,
+      };
+    }
+    const dir = dy >= 0 ? 1 : -1;
+    return {
+      a: { x: from.x + FW / 2, y: dir > 0 ? from.y + FH : from.y },
+      b: { x: to.x + FW / 2, y: dir > 0 ? to.y : to.y + FH },
+      dir: 0,
+      vertical: true,
+    };
+  }
+
+  function drawWires() {
+    if (!FLOWS.length) {
+      wires.innerHTML = '';
+      return;
+    }
+    const byId = new Map(frames.map((f) => [f.screen, f]));
+    const out = [];
+
+    FLOWS.forEach((flow) => {
+      flow.steps.forEach((step, i) => {
+        if (i === 0) return;
+        const from = byId.get(flow.steps[i - 1].id);
+        const to = byId.get(step.id);
+        if (!from || !to) return;
+
+        const { a, b, dir, vertical } = wireEndpoints(from, to);
+        // A cubic whose controls sit on the same axis leaves the frame straight
+        // out and arrives straight in — a wire, not a scribble across a row.
+        const d = vertical
+          ? `M ${a.x} ${a.y} C ${a.x} ${(a.y + b.y) / 2}, ${b.x} ${(a.y + b.y) / 2}, ${b.x} ${b.y}`
+          : `M ${a.x} ${a.y} C ${(a.x + b.x) / 2} ${a.y}, ${(a.x + b.x) / 2} ${b.y}, ${b.x} ${b.y}`;
+        const head = vertical
+          ? `M ${b.x} ${b.y} l -6 ${-10 * dir} l 12 0 z`
+          : `M ${b.x} ${b.y} l ${-10 * dir} -6 l 0 12 z`;
+
+        out.push(`<path class="wire" d="${d}" />`);
+        out.push(`<path class="wire__head" d="${head}" />`);
+
+        if (step.label) {
+          const px = 1 / cam.z;
+          const lx = vertical ? a.x + 12 * px : (a.x + b.x) / 2;
+          const ly = vertical ? (a.y + b.y) / 2 : a.y - 10 * px;
+          out.push(
+            `<text class="wire__label" x="${lx}" y="${ly}" text-anchor="${vertical ? 'start' : 'middle'}">${esc(step.label)}</text>`
+          );
+        }
+      });
+    });
+
+    wires.innerHTML = out.join('');
+  }
+
   // ---------------------------------------------------------------- boot
   //
   // Screens arrive from the server: the project's config if it has one,
@@ -1734,6 +1853,7 @@
     }
     syncSelection();
     buildMinimap();
+    drawWires();
     renderDrawer();
     updateEmpty();
     if (frames.length) fit(true);
@@ -1749,6 +1869,7 @@
     applyTitle();
 
     ROUTES = await resolveScreens(manifest);
+    FLOWS = Array.isArray(manifest.flow) ? manifest.flow : [];
 
     const saved = await readStore();
     // Screens added by hand come back with the layout; the crawler will never

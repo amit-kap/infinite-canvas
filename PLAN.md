@@ -21,7 +21,13 @@ forwards WebSocket upgrades so hot reload still works inside a frame.
 **Screens are data, not code.** A screen is `{ key, state?, title, group }`. Ids are
 `key` or `key~state`, so a list and the same list with a drawer open are different screens
 with different comment threads. A frame's URL fully describes what it shows, which is what
-makes an overlay reloadable, screenshotable and sendable.
+makes an overlay reloadable, screenshotable and sendable. `state` is the *app's* token: an
+overlay, an empty dataset, a failed request, a role — the tool only carries it, so one
+mechanism covers every "same screen, different reality".
+
+**A flow is a path, not a variant.** Ordered steps through one route, each a state, drawn as
+wires between ordinary frames. A state is a thing you compare; a flow is a thing you walk.
+The canvas holds no flow state of its own: move a frame and the path follows.
 
 **Config if you have one, a crawl if you don't.** `canvas.config.mjs` is exact but needs
 writing. With no config the tool crawls the app in a hidden iframe — a rendered page, so
@@ -58,6 +64,7 @@ dependencies.
 | 6 | Package: bins, `files`, `engines`, `check`, publish metadata | done |
 | 7 | Validate on a second, unrelated app | done |
 | 8 | Close the loop: comments travel to the agent, edits land live on the frames | done |
+| 9 | States and flows: many realities of one screen, and the path through them | done |
 
 ## Verification
 
@@ -90,6 +97,10 @@ installed copy of the tarball.
 | **Route survives the reload** | a frame navigated to `/case/2288` stayed on `/case/2288` after a script edit reloaded it |
 | **Update feedback** | a MutationObserver over the frames recorded `is-updated` on all 16 for a single stylesheet change, cleared after 1.5s |
 | **No reload loop** | writing `.canvas/layout.json` fires no event; `node_modules/junk/a.js` fires none; `src/deep.js` fires one |
+| **States of one screen** | `cases~empty` renders "No cases yet", `~loading` 7 skeleton rows, `~error` "Couldn't load cases · 504", `~created` 7 rows with `CAS-2294` first, `~new-case-invalid` the drawer with "Give the case a title." — five realities of one route, each a frame |
+| **Flow** | 4 steps of `cases` drawn as 3 wires with labels `click "New case"`, `submit empty`, `submit valid`; steps laid out in their own row on a fresh layout; wires are world-space so they pan and zoom with the frames |
+| **Fit to selection** | selecting 4 flow frames → `Fit` → 12% (that row only, not the 22-screen map); selecting 2 → 25% |
+| **Labels at map scale** | at 9% with 22 screens, labels ride the zoom instead of colliding; at 25%+ they stay at 1:1 |
 | Syntax | `npm run check` clean on all eleven files |
 
 ## Known limits

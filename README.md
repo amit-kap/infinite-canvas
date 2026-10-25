@@ -61,15 +61,43 @@ export default {
 
 With no `screens`, the canvas **crawls the app** for them: it walks your nav from `/` in a hidden iframe, two levels deep, and names each screen from its nav label or its own heading. That is what makes the first run zero-config. `--crawl` ignores the config and shows you what the crawler finds, which is the fastest way to see what you would have to add by hand.
 
-### Modals and drawers
+### Modals, states and flows
 
-`state` names an overlay the app opens on load, and the canvas puts it in the frame's URL:
+`state` is the app's own token, carried in the frame's URL:
 
 ```
-/cases?state=new-case
+/cases?state=new-case      # a drawer the app opens on load
+/cases?state=empty         # the same screen with no data
+/cases?state=error         # the same screen when the request failed
 ```
 
-So a modal is not a special case in the tool: it is a frame whose URL fully describes what it shows. Reload it, screenshot it, or hand it to an agent and the drawer is still open. The app owns the registry (in the demo, `OVERLAYS` in `app/app.js`); the canvas only needs the name.
+The canvas does not care what a token means — it only puts it in the URL and keys comments off `cases` vs `cases~new-case`. So one mechanism covers overlays, loading, empty, error, a role, a fixture, anything the app can reproduce from a URL. Adding a state is app work, not tool work.
+
+That is the answer to "what does this look like when…" — **states** of one screen sit beside it on the canvas, and the agent reviews the one that breaks:
+
+```js
+{ key: 'cases', state: 'empty',   title: 'Cases — empty',   group: 'States' },
+{ key: 'cases', state: 'loading', title: 'Cases — loading', group: 'States' },
+{ key: 'cases', state: 'error',   title: 'Cases — error',   group: 'States' },
+```
+
+**A flow** is the other shape: an ordered path through one screen, where every step is the same route in a different state — click, fill, fail, succeed. Declare it and the canvas draws the path between the frames; the steps are ordinary screens, laid out in a row on a fresh layout:
+
+```js
+flow: [
+  {
+    title: 'New case',
+    steps: [
+      { id: 'cases', label: 'open' },
+      { id: 'cases~new-case', label: 'click "New case"' },
+      { id: 'cases~new-case-invalid', label: 'submit empty' },
+      { id: 'cases~created', label: 'submit valid' },
+    ],
+  },
+],
+```
+
+The wires live in the canvas, not in the state: move a frame and the path follows, at any zoom. `Fit` frames the selection when there is one, so you can look at a single flow or a single row of states.
 
 A crawler can only follow links, so a drawer that opens from a button is invisible to it. Two ways to get one on the canvas:
 
@@ -90,7 +118,7 @@ Screen ids are `cases` and `cases~new-case`, and comments key off the id rather 
 | Search / jump | `Add screen` lists every screen; on-canvas ones fly you there |
 | Comment | select a screen → `Comment` → type → `Add comment` (⌘↵), or resolve it from the drawer |
 | Agent | select screens → `Send to agent` → comments appear on frames and in the drawer |
-| Fit all | `0` or `Fit` · 100% = `1` · remove = `Backspace` · clear = `Esc` |
+| Fit / keys | `0` or `Fit` frames the selection, or everything if nothing is selected · 100% = `1` · remove = `Backspace` · clear = `Esc` |
 
 Below 50% zoom the frames are inert, so the canvas takes every gesture — including a press-and-drag that moves the frame and a plain click that flies into it. Above 50%, screens are live: tabs, filters, toggles, forms and row navigation all work. Zoom keeps working over a screen because the frame forwards ⌘-wheel to the canvas; a plain two-finger scroll over a screen scrolls that screen, and space + scroll pans the canvas from anywhere.
 

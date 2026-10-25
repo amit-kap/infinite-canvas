@@ -463,3 +463,67 @@ textarea.input { height: auto; padding: 8px 10px; resize: none; line-height: 1.6
 .input:disabled { background: var(--bg-2); color: var(--muted); }
 
 .table tr[hidden] { display: none; }
+
+/* ------------------------------------------------------------------ states
+   The two states almost no design file draws: waiting for data, and the data
+   not arriving. Both are real screens, so both belong on the canvas. */
+
+.skel { display: flex; flex-direction: column; gap: 14px; }
+
+.skel__row { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; }
+
+.skel__row--head .skel__b {
+  height: 9px;
+  border-radius: 3px;
+  background: #ededE8;
+}
+
+.skel__b {
+  display: block;
+  height: 12px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f0f0eb 25%, #f7f7f3 50%, #f0f0eb 75%);
+  background-size: 240% 100%;
+  animation: skel 1.4s ease-in-out infinite;
+}
+
+.skel__b--wide { width: 74%; }
+
+@keyframes skel {
+  0% { background-position: 120% 0; }
+  100% { background-position: -120% 0; }
+}
+
+.failed { max-width: 460px; }
+
+.failed__title { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+
+.failed__body { font-size: 13px; color: var(--muted); margin-top: 6px; line-height: 1.55; }
+
+.failed__foot { display: flex; align-items: center; gap: 12px; margin-top: 16px; }
+
+.failed__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #a8a8a0;
+}
+
+.input--error { border-color: var(--red) !important; }
+.input--error:focus { box-shadow: 0 0 0 3px var(--red-bg) !important; }
+
+.field__error { font-size: 11.5px; color: var(--red); margin-top: 5px; }
+
+.blank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 64px 20px;
+  text-align: center;
+}
+
+.blank__title { font-size: 14px; font-weight: 600; }
+
+.blank__body { font-size: 13px; color: var(--muted); max-width: 40ch; }
+
+.blank .btn { margin-top: 10px; }
