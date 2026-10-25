@@ -1,0 +1,44 @@
+{
+  "name": "infinitecanvas",
+  "version": "0.2.0",
+  "description": "Every screen of your app on one canvas — live, arranged like a map, sendable to an agent.",
+  "bin": {
+    "canvas": "bin/canvas.js",
+    "canvas-agent": "bin/agent-stub.js"
+  },
+  "files": [
+    "bin",
+    "lib",
+    "public",
+    "app",
+    "canvas.config.mjs",
+    "README.md",
+    "PLAN.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "start": "node bin/canvas.js --demo",
+    "canvas": "node bin/canvas.js",
+    "check": "node --check bin/canvas.js && node --check bin/agent-stub.js && node --check lib/config.js && node --check lib/server.js && node --check lib/agent-stub.js && node --check public/canvas.js && node --check public/crawl.js && node --check public/glue.js && node --check app/app.js && node --check examples/ledger/app.js && node --check examples/ledger/data.js",
+    "agent": "node bin/agent-stub.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "screens",
+    "devtools",
+    "canvas",
+    "iframe",
+    "agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourname/infinitecanvas"
+  },
+  "homepage": "https://github.com/yourname/infinitecanvas#readme"
+}

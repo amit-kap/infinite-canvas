@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ledger</title>
+<link rel="stylesheet" href="app.css" />
+</head>
+<body>
+<div class="app">
+  <header class="bar">
+    <a class="brand" href="/">
+      <span class="brand__mark"></span>
+      <span class="brand__name">Ledger</span>
+    </a>
+    <nav class="nav" id="nav"></nav>
+    <div class="bar__right">
+      <span class="chip-static">FY 2026</span>
+      <span class="avatar">NS</span>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="head">
+      <div>
+        <h1 id="title"></h1>
+        <div class="sub" id="sub"></div>
+      </div>
+      <div class="head__actions" id="actions"></div>
+    </div>
+    <div class="content" id="content"></div>
+  </main>
+</div>
+<div id="overlay"></div>
+<div class="toast" id="toast"></div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kestrel — canvas</title>
+<link rel="stylesheet" href="canvas.css" />
+</head>
+<body>
+
+<header id="bar">
+  <div class="brand">
+    <div class="brand__mark" id="brandMark">K</div>
+    <div class="brand__name" id="brandName">Infinite canvas</div>
+    <div class="brand__tag">canvas</div>
+  </div>
+  <div class="bar__spacer"></div>
+  <button type="button" class="tb" id="addBtn">Add screen</button>
+  <button type="button" class="tb" id="commentsBtn">Comments <span class="tb__count" id="commentsCount" hidden>0</span></button>
+  <button type="button" class="tb tb--icon" id="menuBtn" aria-label="More">···</button>
+</header>
+
+<main id="stage">
+  <div id="grid" aria-hidden="true"></div>
+  <div id="world">
+    <div id="guides"></div>
+    <div id="frames"></div>
+  </div>
+  <div id="empty" hidden>
+    <p>No screens on the canvas</p>
+    <button type="button" class="tb tb--primary" id="emptyAdd">Add screen</button>
+  </div>
+</main>
+
+<div id="zoom" role="group" aria-label="Zoom">
+  <button type="button" id="zoomOut" aria-label="Zoom out">−</button>
+  <span id="zoomLabel">100%</span>
+  <button type="button" id="zoomIn" aria-label="Zoom in">+</button>
+  <button type="button" id="zoomFit" aria-label="Fit all screens">Fit</button>
+</div>
+
+<div id="minimap">
+  <div id="mmFrames"><div id="mmView"></div></div>
+</div>
+
+<div id="selbar" hidden>
+  <span id="selCount">0 screens</span>
+  <button type="button" class="selbar__ghost" id="commentBtn">Comment</button>
+  <button type="button" class="selbar__btn" id="sendBtn">Send to agent</button>
+  <button type="button" class="selbar__ghost" id="clearBtn">Clear</button>
+</div>
+
+<div id="composer" class="popover" hidden>
+  <div class="popover__title" id="composerTitle">Add comment</div>
+  <textarea id="composerText" class="composer__text" rows="3" placeholder="What's wrong with this screen?"></textarea>
+  <div class="composer__foot">
+    <span class="composer__hint">⌘↵ to add</span>
+    <button type="button" class="tb tb--primary" id="composerAdd">Add comment</button>
+  </div>
+</div>
+
+<div id="marquee"></div>
+
+<aside id="drawer" hidden>
+  <div class="drawer__head">
+    <span>Comments</span>
+    <span class="drawer__count" id="drawerCount"></span>
+    <button type="button" class="drawer__close" id="drawerClose" aria-label="Close comments">×</button>
+  </div>
+  <div class="drawer__body" id="drawerBody"></div>
+</aside>
+
+<div id="picker" class="popover" hidden></div>
+<div id="menu" class="popover" hidden></div>
+<div id="toast"></div>
+
+<script src="crawl.js"></script>
+<script src="canvas.js"></script>
+</body>
+</html>
