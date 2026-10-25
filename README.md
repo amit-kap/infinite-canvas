@@ -61,48 +61,24 @@ export default {
 
 With no `screens`, the canvas **crawls the app** for them: it walks your nav from `/` in a hidden iframe, two levels deep, and names each screen from its nav label or its own heading. That is what makes the first run zero-config. `--crawl` ignores the config and shows you what the crawler finds, which is the fastest way to see what you would have to add by hand.
 
-### Modals, states and flows
+### States, and the flow you build
 
-`state` is the app's own token, carried in the frame's URL:
+A frame is not a picture of a screen — it is the screen. Scroll it, click it, open a drawer, apply a filter, submit the form badly. Whatever the app does, happens. Above 50% zoom it is fully live; below that, press a frame to drag it, click to fly in.
+
+A screen's state lives in its URL, so a frame remembers where you left it: open a drawer, reload the canvas, the drawer is still open. The canvas only carries the token — `new-case`, `empty`, `error` — and never needs to know what it means:
 
 ```
-/cases?state=new-case      # a drawer the app opens on load
-/cases?state=empty         # the same screen with no data
-/cases?state=error         # the same screen when the request failed
+/cases?state=new-case      a drawer the app opened
+/cases?state=empty         the same screen with no data
+/cases?state=error         the same screen when the request failed
 ```
 
-The canvas does not care what a token means — it only puts it in the URL and keys comments off `cases` vs `cases~new-case`. So one mechanism covers overlays, loading, empty, error, a role, a fixture, anything the app can reproduce from a URL. Adding a state is app work, not tool work.
+That gives you two ways to get a state onto the canvas:
 
-That is the answer to "what does this look like when…" — **states** of one screen sit beside it on the canvas, and the agent reviews the one that breaks:
+- **`Duplicate` (⌘D)** — forks a frame *at the state it is in right now*. Open the drawer, fork it, and the copy is a screen of its own; keep clicking in the copy and it moves on while the original stays put. This is how you build a flow: play with the real screen, fork the moments worth keeping, arrange them.
+- **`Add screen` → Any screen** — for states nothing can click into: no empty database, no failing request. Route plus token, and it is a frame.
 
-```js
-{ key: 'cases', state: 'empty',   title: 'Cases — empty',   group: 'States' },
-{ key: 'cases', state: 'loading', title: 'Cases — loading', group: 'States' },
-{ key: 'cases', state: 'error',   title: 'Cases — error',   group: 'States' },
-```
-
-**A flow** is the other shape: an ordered path through one screen, where every step is the same route in a different state — click, fill, fail, succeed. Declare it and the canvas draws the path between the frames; the steps are ordinary screens, laid out in a row on a fresh layout:
-
-```js
-flow: [
-  {
-    title: 'New case',
-    steps: [
-      { id: 'cases', label: 'open' },
-      { id: 'cases~new-case', label: 'click "New case"' },
-      { id: 'cases~new-case-invalid', label: 'submit empty' },
-      { id: 'cases~created', label: 'submit valid' },
-    ],
-  },
-],
-```
-
-The wires live in the canvas, not in the state: move a frame and the path follows, at any zoom. `Fit` frames the selection when there is one, so you can look at a single flow or a single row of states.
-
-A crawler can only follow links, so a drawer that opens from a button is invisible to it. Two ways to get one on the canvas:
-
-- **`Add screen` → Any screen**: type the route and the state (`/invoices`, `new-invoice`) and it becomes a frame. Added screens are saved in `layout.json`, so they come back on reload.
-- **`screens` in the config**, if you want the list in the repo and shared with the team.
+A fork remembers its parent, so the canvas draws the path you actually walked — a wire from the frame you forked to the frame it became. No flow is declared anywhere; the flow is where you put things. `Fit` frames the selection, so you can look at one flow at a time.
 
 Screen ids are `cases` and `cases~new-case`, and comments key off the id rather than the route, so a list and the same list with a drawer open have separate threads. A frame's label follows the app: it shows the screen's own name while it sits on its own route, then whatever route it has navigated to.
 
@@ -113,6 +89,7 @@ Screen ids are `cases` and `cases~new-case`, and comments key off the id rather 
 | Pan | two-finger scroll, space + drag, middle-drag, or arrow keys (⇧ = bigger step) |
 | Zoom | ⌘/Ctrl + scroll (works over a screen too), pinch, double-click empty canvas, or the zoom control |
 | Select | click a frame label, shift-click to add, drag on empty canvas to marquee |
+| Duplicate | `⌘D` / `Ctrl+D`, or `Duplicate` in the selection bar — forks the frame at its current state |
 | Move | drag a frame by its label, or by its body while zoomed out — lands on a 24px grid and snaps to a neighbour's edges and centres; hold ⌥ for free 1:1 movement; moves the whole selection |
 | Enter a screen | click a frame while zoomed out, double-click its label, or click its block in the minimap |
 | Search / jump | `Add screen` lists every screen; on-canvas ones fly you there |
@@ -128,7 +105,7 @@ Motion is built for 1:1 feel: gestures write the camera immediately and the DOM 
 
 ```
 .canvas/
-  layout.json     # frames: screen, route, state, x, y (+ screens added by hand)
+  layout.json     # frames: screen, route, state, x, y, parent (+ screens added by hand)
   comments.json   # threads keyed by screen id
   review.json     # the agent mailbox (see below)
 ```

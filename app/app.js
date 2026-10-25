@@ -40,7 +40,7 @@
     return DATA;
   }
 
-  const D = dataFor(readState());
+  let D = dataFor(readState());
 
   const NAV = [
     { label: 'Monitor', items: ['overview'] },
@@ -259,7 +259,7 @@
         sub: `${counts.all} open`,
         actions:
           `<button type="button" class="btn" data-act="export">Export</button>` +
-          `<button type="button" class="btn btn--primary" data-nav="case/2291">New case</button>`,
+          `<button type="button" class="btn btn--primary" data-act="openState" data-state="new-case">New case</button>`,
         body: `
           <div class="toolbar">
             <div class="chips">
@@ -291,7 +291,7 @@
                 : `<div class="blank">
                     <div class="blank__title">No cases yet</div>
                     <div class="blank__body">Cases open from an alert, or you can file one by hand.</div>
-                    <button type="button" class="btn btn--primary" data-nav="case/2291">New case</button>
+                    <button type="button" class="btn btn--primary" data-act="openState" data-state="new-case">New case</button>
                   </div>`
             }
           </div>
@@ -838,10 +838,20 @@
 
   function closeOverlay() {
     if (!ui.state) return;
-    ui.state = '';
-    history.replaceState(null, '', '?r=' + encodeURIComponent(ui.route));
-    renderOverlay();
-    post('state', { state: '' });
+    setState('');
+  }
+
+  // The one convention the canvas asks of an app: if a state is worth looking
+  // at, make it addressable. Then a frame you forked keeps exactly what you
+  // saw, a reload reproduces it, and an agent can open it. Everything else is
+  // the app's business.
+  function setState(token) {
+    ui.state = token || '';
+    const url = '?r=' + encodeURIComponent(ui.route) + (ui.state ? '&state=' + encodeURIComponent(ui.state) : '');
+    history.replaceState(null, '', url);
+    D = dataFor(ui.state);
+    render();
+    post('state', { state: ui.state });
   }
 
   // ---------------------------------------------------------------- actions
@@ -971,7 +981,21 @@
       case 'closeOverlay':
         closeOverlay();
         break;
+      case 'openState':
+        // An app opens its own overlay, and puts it in the URL on the way. The
+        // canvas only sees a state token, so clicking into a drawer is enough
+        // for the frame to become a screen you can fork.
+        setState(el.dataset.state);
+        break;
       case 'confirmOverlay':
+        // Submitting the new-case drawer has two outcomes and both are
+        // addressable: an empty title is a validation state, a filled one
+        // creates the case. That is what makes them forkable.
+        if (ui.state === 'new-case' || ui.state === 'new-case-invalid') {
+          const field = document.querySelector('.sheet .input');
+          setState(field && field.value.trim() ? 'created' : 'new-case-invalid');
+          break;
+        }
         toast(el.dataset.msg || 'Done');
         closeOverlay();
         break;

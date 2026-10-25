@@ -623,12 +623,3 @@ body.has-drawer #selbar { left: calc((100vw - 320px) / 2); }
 #wires .wire__head {
   fill: #b9b9b2;
 }
-
-#wires .wire__label {
-  /* Counter-scaled like the frame labels: the wire is in world space, but its
-     text has to stay readable at any zoom. */
-  font-size: calc(11px * var(--inv, 1));
-  fill: #8c8c85;
-  font-family: inherit;
-  letter-spacing: 0.01em;
-}

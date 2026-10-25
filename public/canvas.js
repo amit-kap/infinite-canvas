@@ -7,9 +7,7 @@
   // Screens added by hand (a drawer the crawler cannot see). They live in
   // layout.json next to the frames, so they survive a reload.
   let ADDED = [];
-  // Ordered paths through screens: [{ title, steps: [{ id, label }] }]. A flow
-  // is drawn, not stored — the frames own their positions.
-  let FLOWS = [];
+  // A fork remembers its parent frame id; the wires are drawn from that.
   let wiresDirty = false;
   let ROUTER = 'path';
   let APP_TITLE = '';
@@ -426,7 +424,7 @@
     const meta = screenMeta(sid);
     const route = routeOverride || meta.key;
     const state = typeof stateOverride === 'string' ? stateOverride : meta.state || '';
-    const frame = { id: id || 'f' + uid++, screen: sid, route, state, x, y };
+    const frame = { id: id || 'f' + uid++, screen: sid, route, state, x, y, parent: null };
     const src = frameSrc(route, state);
 
     const el = document.createElement('div');
@@ -486,26 +484,10 @@
   }
 
   function layoutAll() {
-    // A flow reads as a path, so its steps get a row of their own instead of a
-    // place in the grid — otherwise the wire crosses half the canvas. Only on a
-    // fresh layout: once you move a frame, your arrangement is the truth.
-    const inFlow = new Set();
-    FLOWS.forEach((flow) => flow.steps.forEach((step) => inFlow.add(step.id)));
-
-    const grid = ROUTES.filter((entry) => !inFlow.has(screenId(entry)));
-    grid.forEach((entry, i) => {
+    ROUTES.forEach((entry, i) => {
       const col = i % COLS;
       const row = Math.floor(i / COLS);
       addFrame(screenId(entry), col * (FW + GX), row * (FH + GY));
-    });
-
-    let y = Math.ceil(grid.length / COLS) * (FH + GY);
-    // Flow steps sit further apart than grid neighbours: the gap is where the
-    // wire and its label live.
-    const flowPitch = FW + 380;
-    FLOWS.forEach((flow) => {
-      flow.steps.forEach((step, i) => addFrame(step.id, i * flowPitch, y));
-      y += FH + GY;
     });
   }
 
@@ -523,6 +505,51 @@
       if (!taken.has(col + ':' + row)) return [col * pitchX, row * pitchY];
     }
     return [0, 0];
+  }
+
+  // The one verb this canvas needed: take a live frame and keep what you are
+  // looking at. The copy carries the frame's *current* route and state, so a
+  // drawer you opened, a filter you applied, a case you just created — whatever
+  // the app put in the URL — survives as its own screen. Place it to the right
+  // and a flow builds itself out of the moments you chose to keep.
+  function duplicateSelected() {
+    if (!selected.size) return;
+    const sources = frames.filter((f) => selected.has(f.id));
+    const created = [];
+
+    sources.forEach((src) => {
+      const [x, y] = beside(src);
+      const sid = src.state ? src.route + '~' + src.state : src.route;
+      const copy = addFrame(sid, x, y, null, src.route, src.state);
+      copy.parent = src.id;
+      created.push(copy);
+    });
+
+    selected.clear();
+    created.forEach((f) => selected.add(f.id));
+    syncSelection();
+    buildMinimap();
+    drawWires();
+    save();
+    toast(
+      created.length === 1
+        ? 'Duplicated — move it where it belongs'
+        : created.length + ' screens duplicated'
+    );
+  }
+
+  // The first free slot to the right, so duplicates read in the order you forked
+  // them. Falls back to the grid if the row is full.
+  function beside(frame) {
+    const pitchX = FW + GX;
+    for (let i = 1; i <= 12; i++) {
+      const x = frame.x + pitchX * i;
+      const clash = frames.some(
+        (f) => Math.abs(f.x - x) < FW * 0.5 && Math.abs(f.y - frame.y) < FH * 0.5
+      );
+      if (!clash) return [x, frame.y];
+    }
+    return freeSlot();
   }
 
   function removeSelected() {
@@ -665,6 +692,9 @@
         state: f.state,
         x: f.x,
         y: f.y,
+        // The fork's lineage: which frame it was taken from. It is what draws
+        // the flow, and it is the only new field this model needed.
+        parent: f.parent || null,
       })),
       comments,
     };
@@ -1383,6 +1413,11 @@
       clearSelection();
       return;
     }
+    if ((e.metaKey || e.ctrlKey) && (e.key === 'd' || e.key === 'D')) {
+      e.preventDefault();
+      duplicateSelected();
+      return;
+    }
     if (e.key === 'Backspace' || e.key === 'Delete') {
       removeSelected();
       e.preventDefault();
@@ -1473,6 +1508,7 @@
 
   document.getElementById('drawerClose').addEventListener('click', closeDrawer);
   document.getElementById('sendBtn').addEventListener('click', sendToAgent);
+  document.getElementById('dupeBtn').addEventListener('click', duplicateSelected);
   document.getElementById('clearBtn').addEventListener('click', clearSelection);
   commentBtn.addEventListener('click', openComposer);
   document.getElementById('composerAdd').addEventListener('click', addComment);
@@ -1697,9 +1733,9 @@
 
   // ---------------------------------------------------------------- flows
   //
-  // A flow is an ordered path through one screen: same route, different state,
-  // one step after another. The frames are ordinary screens — the canvas only
-  // draws the path, so a flow costs nothing until you look at it.
+  // A fork remembers where it came from, so the path you actually walked gets
+  // recorded as you explore instead of being declared in a config. Frame B was
+  // duplicated from frame A at a moment, and the wire says so.
   //
   // The wires live inside #world, which the camera transforms, so they pan and
   // zoom for free; the only thing that needs redrawing is a frame moving.
@@ -1716,7 +1752,6 @@
     const dy = to.y - from.y;
     if (Math.abs(dx) >= Math.abs(dy)) {
       const dir = dx >= 0 ? 1 : -1;
-      const y = Math.max(from.y, to.y) + FH / 2 + Math.abs(dy) * 0.1;
       return {
         a: { x: dir > 0 ? from.x + FW : from.x, y: from.y + FH / 2 },
         b: { x: dir > 0 ? to.x : to.x + FW, y: to.y + FH / 2 },
@@ -1733,42 +1768,26 @@
   }
 
   function drawWires() {
-    if (!FLOWS.length) {
-      wires.innerHTML = '';
-      return;
-    }
-    const byId = new Map(frames.map((f) => [f.screen, f]));
+    const byId = new Map(frames.map((f) => [f.id, f]));
     const out = [];
 
-    FLOWS.forEach((flow) => {
-      flow.steps.forEach((step, i) => {
-        if (i === 0) return;
-        const from = byId.get(flow.steps[i - 1].id);
-        const to = byId.get(step.id);
-        if (!from || !to) return;
+    frames.forEach((frame) => {
+      if (!frame.parent) return;
+      const from = byId.get(frame.parent);
+      if (!from || from === frame) return;
 
-        const { a, b, dir, vertical } = wireEndpoints(from, to);
-        // A cubic whose controls sit on the same axis leaves the frame straight
-        // out and arrives straight in — a wire, not a scribble across a row.
-        const d = vertical
-          ? `M ${a.x} ${a.y} C ${a.x} ${(a.y + b.y) / 2}, ${b.x} ${(a.y + b.y) / 2}, ${b.x} ${b.y}`
-          : `M ${a.x} ${a.y} C ${(a.x + b.x) / 2} ${a.y}, ${(a.x + b.x) / 2} ${b.y}, ${b.x} ${b.y}`;
-        const head = vertical
-          ? `M ${b.x} ${b.y} l -6 ${-10 * dir} l 12 0 z`
-          : `M ${b.x} ${b.y} l ${-10 * dir} -6 l 0 12 z`;
+      const { a, b, dir, vertical } = wireEndpoints(from, frame);
+      // A cubic whose controls sit on the same axis leaves the frame straight
+      // out and arrives straight in — a wire, not a scribble across a row.
+      const d = vertical
+        ? `M ${a.x} ${a.y} C ${a.x} ${(a.y + b.y) / 2}, ${b.x} ${(a.y + b.y) / 2}, ${b.x} ${b.y}`
+        : `M ${a.x} ${a.y} C ${(a.x + b.x) / 2} ${a.y}, ${(a.x + b.x) / 2} ${b.y}, ${b.x} ${b.y}`;
+      const head = vertical
+        ? `M ${b.x} ${b.y} l -6 ${-10 * dir} l 12 0 z`
+        : `M ${b.x} ${b.y} l ${-10 * dir} -6 l 0 12 z`;
 
-        out.push(`<path class="wire" d="${d}" />`);
-        out.push(`<path class="wire__head" d="${head}" />`);
-
-        if (step.label) {
-          const px = 1 / cam.z;
-          const lx = vertical ? a.x + 12 * px : (a.x + b.x) / 2;
-          const ly = vertical ? (a.y + b.y) / 2 : a.y - 10 * px;
-          out.push(
-            `<text class="wire__label" x="${lx}" y="${ly}" text-anchor="${vertical ? 'start' : 'middle'}">${esc(step.label)}</text>`
-          );
-        }
-      });
+      out.push(`<path class="wire" d="${d}" />`);
+      out.push(`<path class="wire__head" d="${head}" />`);
     });
 
     wires.innerHTML = out.join('');
@@ -1845,7 +1864,10 @@
     let fresh = false;
     if (saved && Array.isArray(saved.frames) && saved.frames.length) {
       comments = saved.comments || {};
-      saved.frames.forEach((f) => addFrame(f.screen || f.route, f.x, f.y, f.id, f.route, f.state));
+      saved.frames.forEach((f) => {
+        const frame = addFrame(f.screen || f.route, f.x, f.y, f.id, f.route, f.state);
+        frame.parent = f.parent || null;
+      });
       uid = saved.frames.length + 1;
     } else {
       layoutAll();
@@ -1869,7 +1891,6 @@
     applyTitle();
 
     ROUTES = await resolveScreens(manifest);
-    FLOWS = Array.isArray(manifest.flow) ? manifest.flow : [];
 
     const saved = await readStore();
     // Screens added by hand come back with the layout; the crawler will never

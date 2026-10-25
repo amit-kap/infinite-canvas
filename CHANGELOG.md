@@ -43,11 +43,13 @@ installed tarball.
 - **Comments travel with the request**: `POST /__canvas/review` now carries the unresolved
   threads for the selected screens, so the agent receives the instruction and not just the
   screen.
-- **States and flows.** `state` is treated as an opaque app token, so one mechanism covers
-  overlays, empty/loading/error datasets and anything else the app can reproduce from a URL.
-  `flow` in the config declares an ordered path through one screen; the canvas draws it as
-  labelled wires between ordinary frames, in the world layer, so the path pans and zooms with
-  the frames and follows them when they move. On a fresh layout, flow steps get their own row.
+- **Duplicate (`⌘D`)**: forks a frame at the state it is in right now — its current route and
+  state, straight from the live iframe. The copy gets `parent`, so the path you actually walked
+  is drawn as a wire between frames; no flow is declared anywhere. The wires live in the world
+  layer, so they pan, zoom and follow the frames when they move.
+- **States as app tokens.** `state` is opaque to the tool: an overlay, an empty dataset, a
+  failed request — whatever the app can reproduce from a URL. A frame remembers the state it
+  was left in, and `Add screen → Any screen` covers the states nothing can click into.
 - **Fit fits the selection** when there is one, everything otherwise.
 - `examples/ledger/` — a second app (path routing, real `<a href>` links, two drawers, no
   canvas code) used to check that none of this is Kestrel-specific.

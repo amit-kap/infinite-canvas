@@ -25,9 +25,15 @@ makes an overlay reloadable, screenshotable and sendable. `state` is the *app's*
 overlay, an empty dataset, a failed request, a role — the tool only carries it, so one
 mechanism covers every "same screen, different reality".
 
-**A flow is a path, not a variant.** Ordered steps through one route, each a state, drawn as
-wires between ordinary frames. A state is a thing you compare; a flow is a thing you walk.
-The canvas holds no flow state of its own: move a frame and the path follows.
+**A frame is the screen, not a picture of it.** You click it into whatever you want to see and it
+does that; the state it lands in is in the URL, so it survives a reload. The canvas only carries
+the token — it never needs to know that `new-case` is a drawer and `empty` is a fixture.
+
+**The flow is what you build, not what you declare.** `Duplicate` forks a frame at the state it
+is in, and a fork remembers its parent, so the path you actually walked gets drawn as you
+explore. Nothing enumerates states up front and nothing declares an order: you play with the real
+screen, keep the moments that matter, and arrange them. A declared flow would only be a guess
+about a journey you have not taken yet.
 
 **Config if you have one, a crawl if you don't.** `canvas.config.mjs` is exact but needs
 writing. With no config the tool crawls the app in a hidden iframe — a rendered page, so
@@ -64,7 +70,7 @@ dependencies.
 | 6 | Package: bins, `files`, `engines`, `check`, publish metadata | done |
 | 7 | Validate on a second, unrelated app | done |
 | 8 | Close the loop: comments travel to the agent, edits land live on the frames | done |
-| 9 | States and flows: many realities of one screen, and the path through them | done |
+| 9 | States and flows: fork a live frame, arrange it, the path draws itself | done |
 
 ## Verification
 
@@ -97,10 +103,11 @@ installed copy of the tarball.
 | **Route survives the reload** | a frame navigated to `/case/2288` stayed on `/case/2288` after a script edit reloaded it |
 | **Update feedback** | a MutationObserver over the frames recorded `is-updated` on all 16 for a single stylesheet change, cleared after 1.5s |
 | **No reload loop** | writing `.canvas/layout.json` fires no event; `node_modules/junk/a.js` fires none; `src/deep.js` fires one |
-| **States of one screen** | `cases~empty` renders "No cases yet", `~loading` 7 skeleton rows, `~error` "Couldn't load cases · 504", `~created` 7 rows with `CAS-2294` first, `~new-case-invalid` the drawer with "Give the case a title." — five realities of one route, each a frame |
-| **Flow** | 4 steps of `cases` drawn as 3 wires with labels `click "New case"`, `submit empty`, `submit valid`; steps laid out in their own row on a fresh layout; wires are world-space so they pan and zoom with the frames |
-| **Fit to selection** | selecting 4 flow frames → `Fit` → 12% (that row only, not the 22-screen map); selecting 2 → 25% |
-| **Labels at map scale** | at 9% with 22 screens, labels ride the zoom instead of colliding; at 25%+ they stay at 1:1 |
+| **States of one screen** | `cases~empty` renders "No cases yet", `~loading` 7 skeleton rows, `~error` "Couldn't load cases · 504" — the states nobody can click into, reached by URL |
+| **Fork a live frame** | clicked "New case" inside the frame → it relabelled `/cases · new-case` and the state reached `layout.json`; `⌘D` produced a second frame on that exact state with `parent` pointing at the original |
+| **A flow built by playing** | continued in the fork: submit empty → `/cases · new-case-invalid` ("Give the case a title."), fork again, fill it → `/cases · created` with 7 rows, fork again → 3 wires across the chain `f2 → f21 → f22 → f23`, all persisted |
+| **Fit to selection** | selecting 2 frames → `Fit` → 25%; selecting a row of 4 → 12%, instead of the whole 20-screen map |
+| **Labels at map scale** | at 9% labels ride the zoom instead of colliding; at 25%+ they stay at 1:1 |
 | Syntax | `npm run check` clean on all eleven files |
 
 ## Known limits
@@ -129,12 +136,16 @@ installed copy of the tarball.
 
 ## Next
 
-1. "Capture state": open a drawer inside a frame, press a key, get a screen — removes the last
-   manual step for modals.
-2. Keep JS state across a reload: re-open the drawer / re-apply the filters the frame had,
+1. Keep JS state across a reload: re-open the drawer / re-apply the filters the frame had,
    so an agent's script edit doesn't cost you your place.
-3. Frame size in the config (`1280×800` default), so a mobile app is possible.
-4. Coordinates on comments: a pin at a point inside the frame, stored as a fraction of the
+2. Frame size in the config (`1280×800` default), so a mobile app is possible.
+3. Coordinates on comments: a pin at a point inside the frame, stored as a fraction of the
    frame, drawn over the screen.
-5. Publish `infinitecanvas` to npm, then test `npx canvas --app <a real Vite app>` on a machine
+4. Publish `infinitecanvas` to npm, then test `npx canvas --app <a real Vite app>` on a machine
    that has never seen this repo.
+
+## Built and dropped
+
+- **Declared flows** (`flow: [{ steps: [...] }]` in the config): a path you write down before
+  walking it. Replaced by `Duplicate`, which forks a live frame and records the lineage. The
+  config knew the order; the user knew the journey — the journey won.
