@@ -38,7 +38,10 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/yourname/infinitecanvas"
+    "url": "git+https://github.com/amit-kap/infinite-canvas.git"
   },
-  "homepage": "https://github.com/yourname/infinitecanvas#readme"
+  "homepage": "https://github.com/amit-kap/infinite-canvas#readme",
+  "bugs": {
+    "url": "https://github.com/amit-kap/infinite-canvas/issues"
+  }
 }
